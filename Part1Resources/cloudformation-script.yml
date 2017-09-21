@@ -1,0 +1,142 @@
+Parameters:
+  KeyPairName:
+    Description: The name of your SSH Key Pair.
+    Type: String
+    MinLength: 1
+  ResourcePrefix:
+    Description: String prepended to all resources created
+    Type: String
+    MinLength: 1
+    MaxLength: 16
+    Default: scaling-demo-pt1
+
+Resources:
+  # ==[ VPC ]==========================================================================
+
+  # The VPC (Virtual Private Cloud) encapsulating the software ecosystem.
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourcePrefix}-vpc"
+
+  # ==[ Routing ]======================================================================
+
+  # Provides a gateway for internet traffic in and out of the VPC.
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub "${ResourcePrefix}-internet-gateway"
+
+  # Attaches the Internet Gateway to the VPC.
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Routing table used to determine where network traffic is directed.
+  RoutingTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  # Routes internet traffic through the Internet Gateway.
+  RouteVPC:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RoutingTable
+
+  # ==[ Subnets ]======================================================================
+
+  # Subnet 1 in Availability Zone 1 for the region.
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.32.0/20
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${ResourcePrefix}-vpc-subnet-1"
+
+  # Subnet 2 in Availability Zone 2 for the region.
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.16.0/20
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${ResourcePrefix}-vpc-subnet-2"
+
+  # Associates the first subnet with the Routing Table.
+  Subnet1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RoutingTable
+      SubnetId: !Ref Subnet1
+
+  # Associates the second subnet with the Routing Table.
+  Subnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RoutingTable
+      SubnetId: !Ref Subnet2
+
+  # ==[ Security groups ]==============================================================
+
+  # Allows SSH from anywhere
+  SSHFromAnywhere:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows SSH from anywhere
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourcePrefix}-ssh-from-anywhere"
+
+  # ==[ Auto-Scaling ]================================================================
+
+  # Launch Configuration using Ubuntu 16.04 LTS x64
+  UbuntuWithCodeDeployAgent:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-09d2fb69 # AWS-provided AMI: "Ubuntu Server 16.04 LTS (HVM), SSD Volume Type" as of 20170921_0026 UTC 
+      InstanceMonitoring: false
+      InstanceType: t2.micro # Free tier eligible
+      KeyName: !Sub "${KeyPairName}"
+      SecurityGroups:
+        - !Ref SSHFromAnywhere
+
+  # Auto-Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref UbuntuWithCodeDeployAgent
+      MaxSize: 1
+      MinSize: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourcePrefix}-auto-scaling-group"
+          PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        - !Ref Subnet1
+        - !Ref Subnet2
