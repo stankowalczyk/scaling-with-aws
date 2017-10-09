@@ -4,7 +4,7 @@ This repo is here to help you get started with AWS scaling using EC2 instances. 
 
 The blogs are posted on the Deakin Software and Technology Innovation Lab's [blog post site](http://dstil.ghost.io/), and the content is split over multiple blog posts (some of which are coming soon).
 
-Please find the resources for the first part of the blog series [here](./Part1Resources/).
+Please the resources for the first part of the blog post (including a copy of the post itself) [here](./Part1Resources/).
 
 ## License
 
