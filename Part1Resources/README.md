@@ -1,3 +1,5 @@
+The first part of the blog post can be found [here](http://dstil.ghost.io/scaling-with-aws-1). Alternatively you can continue reading below.
+
 ![Cover Photo: Scales](./Images/cover-photo.jpg "Cover Photo: Scales")
 
 # Scaling your services with AWS: Part 1
